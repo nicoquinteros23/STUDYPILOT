@@ -1,4 +1,4 @@
-# University Schedule
+# StudyPilot
 
 Una aplicación web para gestionar planes de estudio universitarios, desarrollada con Next.js, TypeScript, Tailwind CSS y Supabase.
 
