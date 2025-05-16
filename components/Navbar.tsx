@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Menu, Home, User, LogOut, BookOpen, Settings } from "lucide-react"
+import { Menu, Home, User, LogOut, BookOpen, Settings, BarChart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -13,18 +13,49 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/AuthContext"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { supabase } from "@/lib/supabase"
+
+interface UserProfile {
+  id: string
+  email: string
+  full_name?: string
+  avatar_url?: string
+}
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const { user, signOut } = useAuth()
+  const [profile, setProfile] = useState<UserProfile | null>(null)
 
   // Asegurarse de que el componente esté montado para evitar problemas de hidratación
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Obtener el perfil del usuario
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return
+
+      try {
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single()
+
+        if (error) throw error
+        setProfile(profile)
+      } catch (error) {
+        console.error("Error fetching profile:", error)
+      }
+    }
+
+    fetchProfile()
+  }, [user])
 
   const getUserInitials = () => {
     if (!user || !user.email) return "U"
@@ -47,6 +78,7 @@ export default function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
+                    <AvatarImage src={profile?.avatar_url} />
                     <AvatarFallback>{getUserInitials()}</AvatarFallback>
                   </Avatar>
                 </Button>
@@ -56,6 +88,12 @@ export default function Navbar() {
                   <Link href="/profile" className="flex items-center">
                     <User className="mr-2 h-4 w-4" />
                     <span>Perfil</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/review" className="flex items-center">
+                    <BarChart className="mr-2 h-4 w-4" />
+                    <span>Resumen</span>
                   </Link>
                 </DropdownMenuItem>
                 {isAdmin && (

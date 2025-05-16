@@ -25,7 +25,7 @@ interface Subject {
 interface UserSubject {
   id: string
   subject_id: string
-  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  status: 'pending' | 'in_progress' | 'completed' | 'pendingFinal'
   grade?: number
   notes?: string
 }
@@ -148,8 +148,8 @@ export default function SistemasCareerPage() {
         return 'En curso'
       case 'completed':
         return 'Aprobada'
-      case 'failed':
-        return 'Desaprobada'
+      case 'pendingFinal':
+        return 'Final pendiente'
       default:
         return 'Por cursar'
     }
@@ -163,8 +163,8 @@ export default function SistemasCareerPage() {
         return 'bg-blue-100 text-blue-800'
       case 'completed':
         return 'bg-green-100 text-green-800'
-      case 'failed':
-        return 'bg-red-100 text-red-800'
+      case 'pendingFinal':
+        return 'bg-amber-100 text-amber-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
@@ -229,7 +229,7 @@ export default function SistemasCareerPage() {
               <SelectItem value="pending">Por cursar</SelectItem>
               <SelectItem value="in_progress">En curso</SelectItem>
               <SelectItem value="completed">Aprobadas</SelectItem>
-              <SelectItem value="failed">Desaprobadas</SelectItem>
+              <SelectItem value="pendingFinal">Final pendiente</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -265,7 +265,7 @@ export default function SistemasCareerPage() {
                           <SelectItem value="pending">Por cursar</SelectItem>
                           <SelectItem value="in_progress">En curso</SelectItem>
                           <SelectItem value="completed">Aprobada</SelectItem>
-                          <SelectItem value="failed">Desaprobada</SelectItem>
+                          <SelectItem value="pendingFinal">Final pendiente</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
