@@ -35,6 +35,34 @@ interface SubjectWithStatus extends Subject {
   userStatus?: UserSubject
 }
 
+// Función para normalizar los datos de correlativas
+function normalizeCorrelativas(subjects: any[]): Subject[] {
+  return subjects.map(subject => {
+    // Log para detectar problemas en los datos
+    if (!Array.isArray(subject.correlativas_cursado)) {
+      console.warn(`Materia ${subject.id} (${subject.name}) tiene correlativas_cursado inválido:`, subject.correlativas_cursado);
+    }
+    if (!Array.isArray(subject.correlativas_final)) {
+      console.warn(`Materia ${subject.id} (${subject.name}) tiene correlativas_final inválido:`, subject.correlativas_final);
+    }
+
+    // Normalizar los campos de correlativas
+    return {
+      ...subject,
+      correlativas_cursado: Array.isArray(subject.correlativas_cursado) 
+        ? subject.correlativas_cursado 
+        : subject.correlativas_cursado 
+          ? [subject.correlativas_cursado] 
+          : [],
+      correlativas_final: Array.isArray(subject.correlativas_final)
+        ? subject.correlativas_final
+        : subject.correlativas_final
+          ? [subject.correlativas_final]
+          : []
+    };
+  });
+}
+
 export default function ReviewPage() {
   const { user } = useAuth()
   const router = useRouter()
@@ -70,6 +98,9 @@ export default function ReviewPage() {
 
       if (subjectsError) throw subjectsError
 
+      // Normalizar los datos de correlativas
+      const normalizedSubjects = normalizeCorrelativas(subjectsData || []);
+
       // Cargar los estados personalizados del usuario
       const { data: userSubjectsData, error: userSubjectsError } = await supabase
         .from('user_subjects')
@@ -79,7 +110,7 @@ export default function ReviewPage() {
       if (userSubjectsError) throw userSubjectsError
 
       // Combinar los datos
-      const subjectsWithStatus = subjectsData.map(subject => ({
+      const subjectsWithStatus = normalizedSubjects.map(subject => ({
         ...subject,
         userStatus: userSubjectsData?.find(us => us.subject_id === subject.id)
       }))

@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 
 interface Subject {
   id: string
@@ -180,6 +181,22 @@ export default function SistemasCareerPage() {
 
   const years = Array.from(new Set(subjects.map(s => s.year))).sort()
 
+  // Función para obtener el estado de una correlativa
+  const getCorrelativaState = (correlativaId: string) => {
+    const correlativa = subjects.find(s => String(s.id).trim() === String(correlativaId).trim())
+    return correlativa?.userStatus?.status || 'pending'
+  }
+
+  // Función para obtener el color de la correlativa
+  const getCorrelativaColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-500 text-white'
+      case 'in_progress': return 'bg-blue-500 text-white'
+      case 'pendingFinal': return 'bg-yellow-400 text-black'
+      default: return 'bg-gray-300 text-gray-700'
+    }
+  }
+
   if (!user) {
     return null // No renderizar nada mientras se redirige
   }
@@ -189,134 +206,154 @@ export default function SistemasCareerPage() {
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Plan de Estudios - Ingeniería en Sistemas</h1>
-      
-      {/* Filtros */}
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <Input
-            placeholder="Buscar por nombre o código..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="md:w-1/3"
-          />
-          <Select
-            value={selectedYear?.toString() || "all"}
-            onValueChange={(value) => setSelectedYear(value === "all" ? null : parseInt(value))}
-          >
-            <SelectTrigger className="md:w-[180px]">
-              <SelectValue placeholder="Filtrar por año" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los años</SelectItem>
-              {years.map(year => (
-                <SelectItem key={year} value={year.toString()}>
-                  {year}° Año
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={selectedStatus || "all"}
-            onValueChange={(value) => setSelectedStatus(value === "all" ? null : value)}
-          >
-            <SelectTrigger className="md:w-[180px]">
-              <SelectValue placeholder="Filtrar por estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="pending">Por cursar</SelectItem>
-              <SelectItem value="in_progress">En curso</SelectItem>
-              <SelectItem value="completed">Aprobadas</SelectItem>
-              <SelectItem value="pendingFinal">Final pendiente</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Lista de materias por año */}
-      {years.map(year => {
-        const yearSubjects = filteredSubjects.filter(s => s.year === year)
-        if (yearSubjects.length === 0) return null
-
-        return (
-          <div key={year} className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">{year}° Año</h2>
-            <div className="space-y-4">
-              {yearSubjects.map((subject) => (
-                <Card key={subject.id}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{subject.name}</CardTitle>
-                        <CardDescription>
-                          {subject.code} - {subject.semester === 0 ? 'Anual' : `${subject.semester}° Cuatrimestre`}
-                        </CardDescription>
-                      </div>
-                      <Select
-                        value={subject.userStatus?.status || 'pending'}
-                        onValueChange={(value) => handleStatusChange(subject.id, value)}
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Cambiar estado" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Por cursar</SelectItem>
-                          <SelectItem value="in_progress">En curso</SelectItem>
-                          <SelectItem value="completed">Aprobada</SelectItem>
-                          <SelectItem value="pendingFinal">Final pendiente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(subject.userStatus?.status || 'pending')}>
-                          {getStatusLabel(subject.userStatus?.status || 'pending')}
-                        </Badge>
-                      </div>
-
-                      {subject.correlativas_cursado.length > 0 && (
-                        <div>
-                          <p className="text-sm font-medium">Correlativas para cursar:</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {subject.correlativas_cursado.map((correlativaId) => {
-                              const correlativa = subjects.find(s => s.id === correlativaId)
-                              return (
-                                <Badge key={correlativaId} variant="secondary">
-                                  {correlativa?.code || correlativaId}
-                                </Badge>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {subject.correlativas_final.length > 0 && (
-                        <div>
-                          <p className="text-sm font-medium">Correlativas para final:</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {subject.correlativas_final.map((correlativaId) => {
-                              const correlativa = subjects.find(s => s.id === correlativaId)
-                              return (
-                                <Badge key={correlativaId} variant="secondary">
-                                  {correlativa?.code || correlativaId}
-                                </Badge>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+    <TooltipProvider>
+      <div className="container mx-auto p-4">
+        <h1 className="text-2xl font-bold mb-4">Plan de Estudios - Ingeniería en Sistemas</h1>
+        
+        {/* Filtros */}
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <Input
+              placeholder="Buscar por nombre o código..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="md:w-1/3"
+            />
+            <Select
+              value={selectedYear?.toString() || "all"}
+              onValueChange={(value) => setSelectedYear(value === "all" ? null : parseInt(value))}
+            >
+              <SelectTrigger className="md:w-[180px]">
+                <SelectValue placeholder="Filtrar por año" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los años</SelectItem>
+                {years.map(year => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}° Año
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={selectedStatus || "all"}
+              onValueChange={(value) => setSelectedStatus(value === "all" ? null : value)}
+            >
+              <SelectTrigger className="md:w-[180px]">
+                <SelectValue placeholder="Filtrar por estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="pending">Por cursar</SelectItem>
+                <SelectItem value="in_progress">En curso</SelectItem>
+                <SelectItem value="completed">Aprobadas</SelectItem>
+                <SelectItem value="pendingFinal">Final pendiente</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        )
-      })}
-    </div>
+        </div>
+
+        {/* Lista de materias por año */}
+        {years.map(year => {
+          const yearSubjects = filteredSubjects.filter(s => s.year === year)
+          if (yearSubjects.length === 0) return null
+
+          return (
+            <div key={year} className="mb-8">
+              <h2 className="text-xl font-semibold mb-4">{year}° Año</h2>
+              <div className="space-y-4">
+                {yearSubjects.map((subject) => (
+                  <Card key={subject.id}>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">{subject.name}</CardTitle>
+                          <CardDescription>
+                            {subject.code} - {subject.semester === 0 ? 'Anual' : `${subject.semester}° Cuatrimestre`}
+                          </CardDescription>
+                        </div>
+                        <Select
+                          value={subject.userStatus?.status || 'pending'}
+                          onValueChange={(value) => handleStatusChange(subject.id, value)}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Cambiar estado" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Por cursar</SelectItem>
+                            <SelectItem value="in_progress">En curso</SelectItem>
+                            <SelectItem value="completed">Aprobada</SelectItem>
+                            <SelectItem value="pendingFinal">Final pendiente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Badge className={getStatusColor(subject.userStatus?.status || 'pending')}>
+                            {getStatusLabel(subject.userStatus?.status || 'pending')}
+                          </Badge>
+                        </div>
+
+                        {subject.correlativas_cursado.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium">Correlativas para cursar:</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {subject.correlativas_cursado.map((correlativaId) => {
+                                const correlativa = subjects.find(s => String(s.id).trim() === String(correlativaId).trim())
+                                const state = getCorrelativaState(correlativaId)
+                                const colorClass = getCorrelativaColor(state)
+                                return (
+                                  <Tooltip key={correlativaId}>
+                                    <TooltipTrigger asChild>
+                                      <span className={`inline-flex items-center justify-center rounded-full w-7 h-7 font-bold text-base ${colorClass} cursor-pointer`}>
+                                        {correlativa?.code || correlativaId}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {correlativa ? correlativa.name : "Materia desconocida"}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {subject.correlativas_final.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium">Correlativas para final:</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {subject.correlativas_final.map((correlativaId) => {
+                                const correlativa = subjects.find(s => String(s.id).trim() === String(correlativaId).trim())
+                                const state = getCorrelativaState(correlativaId)
+                                const colorClass = getCorrelativaColor(state)
+                                return (
+                                  <Tooltip key={correlativaId}>
+                                    <TooltipTrigger asChild>
+                                      <span className={`inline-flex items-center justify-center rounded-full w-7 h-7 font-bold text-base ${colorClass} cursor-pointer`}>
+                                        {correlativa?.code || correlativaId}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {correlativa ? correlativa.name : "Materia desconocida"}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </TooltipProvider>
   )
 } 

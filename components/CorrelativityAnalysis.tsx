@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Lock, Unlock, Info } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface Subject {
   id: string
@@ -25,11 +26,57 @@ interface Props {
   userSubjects: UserSubject[]
 }
 
-function getSubjectStatus(subject: Subject, userSubjects: UserSubject[]): 'blocked' | 'available' {
-  if (!subject.correlativas_cursado || subject.correlativas_cursado.length === 0) return 'available'
-  const approvedIds = userSubjects.filter(us => us.status === 'completed').map(us => us.subject_id)
-  const allCorrelativasAprobadas = subject.correlativas_cursado.every(correlativaId => approvedIds.includes(correlativaId))
-  return allCorrelativasAprobadas ? 'available' : 'blocked'
+function getSubjectStatus(subject: Subject, userSubjects: UserSubject[], subjects: Subject[]): 'blocked' | 'available' {
+  // Asegurarse de que correlativas_cursado sea un array
+  const correlativas = Array.isArray(subject.correlativas_cursado) 
+    ? subject.correlativas_cursado 
+    : subject.correlativas_cursado 
+      ? [subject.correlativas_cursado] 
+      : [];
+
+  // Si no tiene correlativas, está disponible
+  if (correlativas.length === 0) {
+    return 'available';
+  }
+  
+  // Obtener IDs de materias aprobadas y en curso
+  const approvedIds = new Set(
+    userSubjects
+      .filter(us => ['completed', 'in_progress'].includes(us.status))
+      .map(us => String(us.subject_id).trim())
+  );
+
+  // Crear un mapa de códigos de materia a IDs
+  const subjectCodeToId = new Map(
+    subjects.map(s => [String(s.code).trim(), String(s.id).trim()])
+  );
+
+  // Verificar si todas las correlativas están aprobadas o en curso
+  const allCorrelativasAprobadas = correlativas.every(correlativaCode => {
+    const correlativaId = subjectCodeToId.get(String(correlativaCode).trim());
+    return correlativaId && approvedIds.has(correlativaId);
+  });
+
+  // Log para debugging
+  if (!allCorrelativasAprobadas) {
+    console.log(`Materia ${subject.name} está bloqueada porque:`, {
+      correlativas,
+      approvedIds: Array.from(approvedIds),
+      correlativasFaltantes: correlativas.filter(corCode => {
+        const corId = subjectCodeToId.get(String(corCode).trim());
+        return !corId || !approvedIds.has(corId);
+      }).map(corCode => {
+        const corId = subjectCodeToId.get(String(corCode).trim());
+        return {
+          codigo: corCode,
+          id: corId,
+          aprobada: corId ? approvedIds.has(corId) : false
+        };
+      })
+    });
+  }
+  
+  return allCorrelativasAprobadas ? 'available' : 'blocked';
 }
 
 function getMaxYearAndSemester(userSubjects: UserSubject[], subjects: Subject[]) {
@@ -51,13 +98,34 @@ function getMaxYearAndSemester(userSubjects: UserSubject[], subjects: Subject[])
 }
 
 export const CorrelativityAnalysis: React.FC<Props> = ({ subjects, userSubjects }) => {
-  // LOG: Mostrar userSubjects completos
-  console.log('userSubjects:', userSubjects);
-  // LOG: Mostrar todos los IDs de subjects
-  console.log('subject IDs:', subjects.map(s => s.id));
-  // LOG: Mostrar todos los subject_id de userSubjects y sus estados
-  userSubjects.forEach(us => {
-    console.log(`userSubject: subject_id=${us.subject_id}, status=${us.status}`);
+  // Normalizar y validar los datos de entrada
+  const normalizedSubjects = subjects.map(subject => ({
+    ...subject,
+    correlativas_cursado: Array.isArray(subject.correlativas_cursado) 
+      ? subject.correlativas_cursado 
+      : subject.correlativas_cursado 
+        ? [subject.correlativas_cursado] 
+        : [],
+    correlativas_final: Array.isArray(subject.correlativas_final)
+      ? subject.correlativas_final
+      : subject.correlativas_final
+        ? [subject.correlativas_final]
+        : []
+  }));
+
+  // Log detallado de los datos de entrada
+  console.log('Datos de entrada:', {
+    totalSubjects: normalizedSubjects.length,
+    userSubjects: userSubjects.map(us => ({
+      subject_id: us.subject_id,
+      status: us.status
+    })),
+    sampleSubjects: normalizedSubjects.slice(0, 3).map(s => ({
+      id: s.id,
+      name: s.name,
+      correlativas_cursado: s.correlativas_cursado,
+      correlativas_final: s.correlativas_final
+    }))
   });
 
   // IDs de materias a excluir (aprobadas, en curso o con final pendiente)
@@ -67,41 +135,67 @@ export const CorrelativityAnalysis: React.FC<Props> = ({ subjects, userSubjects 
       .map(us => String(us.subject_id).trim())
   );
 
-  // DEBUG: Mostrar excludedIds
-  console.log('excludedIds:', Array.from(excludedIds));
+  console.log('Materias excluidas:', Array.from(excludedIds));
 
-  // Filtrar materias disponibles y bloqueadas asegurando que los IDs coincidan exactamente
-  const blockedSubjects = subjects.filter(s => {
+  // Filtrar materias disponibles y bloqueadas
+  const blockedSubjects = normalizedSubjects.filter(s => {
     const id = String(s.id).trim();
-    const isBlocked = getSubjectStatus(s, userSubjects) === 'blocked';
+    const isBlocked = getSubjectStatus(s, userSubjects, subjects) === 'blocked';
     const isExcluded = excludedIds.has(id);
+    
+    // Log para debugging
+    if (isBlocked && !isExcluded) {
+      console.log(`Materia bloqueada: ${s.name}`, {
+        id: s.id,
+        correlativas: s.correlativas_cursado,
+        isExcluded
+      });
+    }
+    
     return isBlocked && !isExcluded;
   });
 
-  const availableSubjects = subjects.filter(s => {
+  const availableSubjects = normalizedSubjects.filter(s => {
     const id = String(s.id).trim();
-    const isAvailable = getSubjectStatus(s, userSubjects) === 'available';
+    const isAvailable = getSubjectStatus(s, userSubjects, subjects) === 'available';
     const isExcluded = excludedIds.has(id);
+    
+    // Log para debugging
+    if (isAvailable && !isExcluded) {
+      console.log(`Materia disponible: ${s.name}`, {
+        id: s.id,
+        correlativas: s.correlativas_cursado,
+        isExcluded
+      });
+    }
+    
     return isAvailable && !isExcluded;
   });
 
-  // DEBUG: Mostrar materias disponibles y bloqueadas después del filtrado
-  console.log('availableSubjects:', availableSubjects.map(s => s.name));
-  console.log('blockedSubjects:', blockedSubjects.map(s => s.name));
+  // Log de resultados
+  console.log('Resultados del filtrado:', {
+    total: normalizedSubjects.length,
+    excluded: excludedIds.size,
+    blocked: blockedSubjects.length,
+    available: availableSubjects.length,
+    blockedSubjects: blockedSubjects.map(s => s.name),
+    availableSubjects: availableSubjects.map(s => s.name)
+  });
 
   // Detectar materias "siguientes"
-  const { maxYear, maxSemester } = getMaxYearAndSemester(userSubjects, subjects)
+  const { maxYear, maxSemester } = getMaxYearAndSemester(userSubjects, normalizedSubjects);
+  
+  console.log('Año y semestre máximo:', { maxYear, maxSemester });
+
   const nextSubjects = availableSubjects.filter(s =>
     (s.year === maxYear && s.semester > maxSemester) ||
     (s.year === maxYear + 1 && s.semester === 1)
-  )
+  );
 
-  // Detectar materias "siguientes bloqueadas":
-  // Son las bloqueadas del año siguiente o del siguiente cuatrimestre
   const nextBlockedSubjects = blockedSubjects.filter(s =>
     (s.year === maxYear && s.semester > maxSemester) ||
     (s.year === maxYear + 1 && s.semester === 1)
-  )
+  );
 
   // Para cada materia siguiente, determinar qué correlativas faltan aprobar
   function getCorrelativasFaltantes(subject: Subject) {
