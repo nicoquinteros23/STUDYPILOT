@@ -1,6 +1,5 @@
-import dynamic from "next/dynamic";
-
-const SuspenseBoundary = dynamic(() => import("./SuspenseBoundary"), { ssr: false });
+"use client";
+import SuspenseBoundary from "./SuspenseBoundary";
 
 export default function LoginPage() {
   return <SuspenseBoundary />;

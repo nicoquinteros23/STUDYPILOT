@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
 import Link from "next/link"
+import SuspenseBoundary from "./SuspenseBoundary"
 
 export default function LoginForm() {
   const [email, setEmail] = useState("")
